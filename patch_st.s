@@ -45,6 +45,12 @@ open_error:     .asciz "Failed to open log file\n"
 logger_init:
   pushq %rbp
   movq %rsp, %rbp
-  movl %esi,
+  movl %esi, LOGGER_FD_OFFSET(%rdi)
+  movb %dl, LOGGER_LEVEL_OFFSET(%rdi)
+  movq $0, LOGGER_LEVEL_OFFSET+1(%rdi)
+  popq %rbp
+  retq
+.size logger_init, .-logger_init
+
 
 
