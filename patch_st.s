@@ -52,5 +52,38 @@ logger_init:
   retq
 .size logger_init, .-logger_init
 
+#logger creation function
+#logger_t* logger_create_stdout(uint8_t min_level)
+.globl logger_create_stdout
+.type logger_create_stdout, @function
+logger_create_stdout:
+  pushq %rbp
+  movq  %rsp, %rbp
+  pushq %rbx
 
+  #allocate logger structure
+  movq $LOGGER_SIZE, %rdi
+  call malloc
+  testq %rax, %rax
+  jz  .create_strout_error
+
+  movq %rax,%rbx
+
+  #initialize with stdout (fd=1)
+  movq %rbx,%rdi
+  movq $1, %rsi  #stdout fd
+  movzbl 16(%rbp), %edx  #min_level from stack
+  call logger_init
+
+  movq %rbx,%rax
+  jmp .create_stdout_done
+
+.create_stdout_error:
+  xorq %rax, %rax
+
+.create_stdout_done:
+  popq %rbx
+  popq %rbp
+  retq
+.size logger_create_stdout, .-logger_create_stdout
 
