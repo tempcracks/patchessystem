@@ -181,6 +181,129 @@ get_timestamp:
 .size get_timestamp, .-get_timestamp
 
 
+# Core Logging Function
+# void logger_log_impl(logger_t* logger, uint8_t level, 
+#                     const char* message, const char* file,
+#                     const char* function, int line)
+
+.globl logger_log_impl
+.type logger_log_impl, @function
+logger_log_impl:
+
+  pushq %rbp
+  movq %rsp, %rbp
+  subq $256, %rsp #reserve stack space for buffers
+
+  movq  %rdi, -8(%rbp) #logger
+  movb %rsi, -9(%rbp) #level
+  movq %rdx, -24(%rbp) #message
+  movq %rcx, -32(%rbp) #file
+  movq %r8, -40(%rbp) #function
+  movl %r9d, -44(%rbp) #line
+
+  #check log level
+  movq -8(%rbp), %rax
+  movb LOGGER_LEVEL_OFFSET(%rax), %al
+  cmpb %al, -9(%rbp)
+  jb  .log_exit #skip if level too low
+
+  #thread safety:simple spinlock impl
+
+  movq -8(%rbp), %rdi
+  call logger_acquire_lock
+
+  #generate timestamp
+  leaq -128(%rbp), %rdi #timestamp buffer
+  movq $32, %rsi
+  call get_timestamp
+
+  #get level string
+  movzbl  -9(%rbp), %edi
+  call level_to_string
+  movq %rax, -56(%rbp) #level_str
+
+  #format the log message
+
+  #write timestamp
+  movq -8(%rbp), %rax
+  movl LOGGER_FD_OFFSET(%rax), %edi
+  leaq -128(%rbp), %rsi #timestamp
+  call write_string
+
+  #write level
+  movq -8(%rbp), %rax
+  movl LOGGER_FD_OFFSET(%rax), %edi
+  movq -56(%rbp), %rsi
+  call write_string
+
+  #write message
+  movq -8(%rbp), %rax
+  movl LOGGER_FD_OFFSET(%rax), %edi
+  movq -56(%rbp), %rsi #level string
+  call write_string
+
+  #write location info
+  movq -8(%rbp), %rax
+  movl LOGGER_FD_OFFSET(%rax), %edi
+  movq -32(%rbp), %rsi #file
+  call write_string
+
+  movq -8(%rbp), %rax
+  movl LOGGER_FD_OFFSET(%rax), %edi
+  movq -40(%rbp), %rsi #function
+  call write_string
+
+  #write line number(convert to string first)
+  leaq -192(%rbp), %rdi #line buffer
+  movl  -44(%rbp), %esi #line number
+  call int_to_string
+
+  movq -8(%rbp), %rax
+  movl LOGGER_FD_OFFSET(%rax), %edi
+  leaq -192(%rbp), %rsi #line string
+  call write_string
+
+  #newline
+  movq -8(%rbp), %rax
+  movl LOGGER_FD_OFFSET(%rax), %edi
+  leaq newline(%rip), %rsi
+  call write_string
+
+  #release lock
+  movq -8(%rbp), %rdi
+  call logger_release_lock
+
+.log_exit:
+  addq $256, %rsp
+  popq %rbp
+  retq
+.size logger_log_impl, .-logger_log_impl
+
+#thread safety: simple spinlock impl
+#void logger_acquire_lock(logger_t* logger)
+.globl logger_acquire_lock
+.type logger_acquire_lock, @function
+logger_acquire_lock:
+  movq $1, %rax
+.spin_loop:
+  xchgb %al, LOGGER_LEVEL_OFFSET+7(%rdi) #use padding byte as lock
+  testb %al, %al
+  jnz .spin_loop
+  retq
+.size logger_acquire_lock, .-logger_acquire_lock
+
+#void logger_release_lock(logger_t* logger)
+.globl logger_release_lock
+.type logger_release_lock, @function
+logger_release_lock:
+  movb $0, LOGGER_LEVEL_OFFSET+7(%rdi)
+  retq
+.size logger_release_lock, .-logger_release_lock
+
+  
+
+  
+
 
 
 
