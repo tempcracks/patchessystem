@@ -300,6 +300,109 @@ logger_release_lock:
   retq
 .size logger_release_lock, .-logger_release_lock
 
+#utility functions
+#void write_string(int fd,const char* str)
+.globl write_string
+.type write_string, @functions
+write_string:
+  pushq %rbp
+  movq %rsp, %rbp
+
+  #calculate string length
+  movq %rsi, %rdx
+  call strlen
+  movq %rax, %rdx #length
+
+  #write system call
+  movl %edi, %ebx #fd
+  movq %rsi, %rcx #buffer
+  movq $SYS_WRITE, %rax
+  int $0x80
+
+  popq %rbp
+  retq
+.size write_string, .-write_string
+
+  #void int_to_string(char* buffer, int value)
+  .globl int_to_string
+  .type int_to_string, @functions
+  int_to_string:
+    pushq %rbp
+    movq %rsp, %rbp
+
+    #simple integer to string conversion
+    movl %esi, %eax
+    movq %rdi, %r8
+    movq $10, %rcx
+    movq $0, %r9 #digit count
+
+  .convert_loop:
+    xorq %rdx, %rdx
+    divq %rcx
+    addb $'0', %dl
+    movb %dl, (%r8,%r9)
+    incq %r9
+    testq  %rax,%rax
+    jnz .convert_loop
+
+    #null terminate
+    movb $0, (%r8,%r9)
+
+    #reverse the string
+    movq %r8, %rdi
+    call reverse_string
+
+     popq %rbp
+     retq
+    .size int_to_string, .-int_to_string
+
+  #convenience macros for different  log levels
+
+.macro LOG_DEBUG logger, message, file, function, line
+  movq \logger, %rdi
+  movb $LOG_DEBUG, %sil
+  leaq \message(%rip), %rdx
+  leaq \file(%rip), %rcx
+  movl \line, %r9d
+  call logger_log_impl
+.endm
+
+.macro LOG_INFO logger, message, file, function, line
+  movq \logger, %rdi
+  movb $LOG_INFO, %sil
+  leaq \message(%rip), %rdx
+  leaq \file(%rip), %rcx
+  leaq \function(%rip), %r8
+  movl \line, %r9d
+  call logger_log_impl
+.endm
+
+  .section rodata
+  example_file: .asciz "main.c"
+  example_func: .asciz "main"
+  example_mgs: .asciz "Application started"
+
+  .text
+  .globl _start
+  .type _start, @function
+  _start:
+
+    #create logger
+    movb $LOG_DEBUG, %dil
+    call logger_create_stdout
+    movq %rax, %r12 #save logger
+
+    #log a message
+    LOG_INFO %r12, example_msg, example_file, example_func, 42
+
+    #exit
+    movq $SYS_EXIT, %rax
+    xorq %rdi, %rdi
+    int $0x80
+  .size _start, .-_start
+
+  
+      
   
 
   
