@@ -67,31 +67,6 @@ logger_create_stdout:
   testq %rax, %rax
   jz  .create_strout_error
 
-  movq %rax,%rbxlogger_init:
-  pushq %rbp
-  movq %rsp, %rbp
-  movl %esi, LOGGER_FD_OFFSET(%rdi)
-  movb %dl, LOGGER_LEVEL_OFFSET(%rdi)
-  movq $0, LOGGER_LEVEL_OFFSET+1(%rdi)
-  popq %rbp
-  retq
-.size logger_init, .-logger_init
-
-#logger creation function
-#logger_t* logger_create_stdout(uint8_t min_level)
-.globl logger_create_stdout
-.type logger_create_stdout, @function
-logger_create_stdout:
-  pushq %rbp
-  movq  %rsp, %rbp
-  pushq %rbx
-
-  #allocate logger structure
-  movq $LOGGER_SIZE, %rdi
-  call malloc
-  testq %rax, %rax
-  jz  .create_strout_error
-
   movq %rax,%rbx
 
   #initialize with stdout (fd=1)
